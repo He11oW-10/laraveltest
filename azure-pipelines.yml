@@ -1,0 +1,91 @@
+# PHP
+# Test and package your PHP project.
+# Add steps that run tests, save build artifacts, deploy, and more:
+# https://docs.microsoft.com/azure/devops/pipelines/languages/php
+
+trigger:
+- main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+- name: azureSubscription
+  value: 7bfee15b-b0d8-489b-89d7-604bbd66603a
+- name: webAppName
+  value: laraveltest2020-01
+- name: vmImageName
+  value: ubuntu-latest
+- name: environmentName
+  value: laraveltest2020-01
+- name: rootFolder
+  value: $(System.DefaultWorkingDirectory)
+
+stages:
+- stage: Build
+  displayName: Build stage
+  variables:
+  - name: phpVersion
+    value: 7.3
+  jobs:
+  - job: BuildJob
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: CmdLine@2
+      displayName: Use PHP version $(phpVersion)
+      inputs:
+        script: >
+          sudo update-alternatives --set php /usr/bin/php$(phpVersion)
+
+          sudo update-alternatives --set phar /usr/bin/phar$(phpVersion)
+
+          sudo update-alternatives --set phpdbg /usr/bin/phpdbg$(phpVersion)
+
+          sudo update-alternatives --set php-cgi /usr/bin/php-cgi$(phpVersion)
+
+          sudo update-alternatives --set phar.phar /usr/bin/phar.phar$(phpVersion)
+
+          php -version
+        workingDirectory: $(rootFolder)
+    - task: CmdLine@2
+      displayName: Composer install
+      inputs:
+        script: composer install --no-interaction --prefer-dist
+        workingDirectory: $(rootFolder)
+    - task: CmdLine@2
+      displayName: Generating build assets
+      inputs:
+        script: >
+          sudo npm i -g npm
+
+          sudo chown -R vsts:vsts ~/.npm
+
+          sudo chown -R vsts:vsts ~/.config
+
+          npm install
+
+          npm run prod
+
+          node -v
+    - task: CmdLine@2
+      displayName: Environment Setup
+      inputs:
+        script: >
+          cp .env.example .env
+
+          php artisan key:generate
+    - task: ArchiveFiles@2
+      displayName: Archive files
+      inputs:
+        rootFolderOrFile: $(rootFolder)
+        includeRootFolder: false
+        archiveType: zip
+        archiveFile: $(Build.ArtifactStagingDirectory)/staging.zip
+        replaceExistingArchive: true
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: $(Build.ArtifactStagingDirectory)
+        ArtifactName: drop
+
+
